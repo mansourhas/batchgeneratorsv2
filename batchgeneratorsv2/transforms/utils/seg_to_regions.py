@@ -14,11 +14,12 @@ class ConvertSegmentationToRegionsTransform(SegOnlyTransform):
         num_regions = len(self.regions)
         region_output = torch.zeros((num_regions, *segmentation.shape[1:]), dtype=torch.bool, device=segmentation.device)
         for region_id, region_labels in enumerate(self.regions):
-            if len(region_labels) == 1:
-                region_output[region_id] = segmentation[self.channel_in_seg] == region_labels
+            if isinstance(region_labels, int) or len(region_labels) == 1:
+                if not isinstance(region_labels, int):
+                    region_labels = region_labels[0]
+                region_output[:, region_id] = segmentation[:, self.channel_in_seg] == region_labels
             else:
-                region_output[region_id] = torch.isin(segmentation[self.channel_in_seg], region_labels)
-        # we return bool here and leave it to the loss function to cast it to whatever it needs. Transferring bool to
-        # device followed by cast on device should be faster than having fp32 here and transferring that
-        return region_output
+                region_output[:, region_id] |= torch.isin(segmentation[:, self.channel_in_seg], torch.tensor(region_labels).to(segmentation.dtype))
+        return region_output.to(segmentation.dtype)
+
 
